@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+# add specs for #find_by_cop_name
+
 RSpec.describe RuboCop::Cop::Registry do
   subject(:registry) { described_class.new(cops, options) }
 
