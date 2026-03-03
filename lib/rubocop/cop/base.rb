@@ -109,9 +109,7 @@ module RuboCop
       # Returns true if the cop name or the cop namespace matches any of the
       # given names.
       def self.match?(given_names)
-        return false unless given_names
-
-        given_names.include?(cop_name) || given_names.include?(badge.department_name)
+        badge.match_name?(given_names)
       end
 
       # Override and return the Force class(es) you need to join

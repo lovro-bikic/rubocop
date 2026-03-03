@@ -379,7 +379,7 @@ module RuboCop
 
     def mobilize_team(processed_source)
       config = @config_store.for_file(processed_source.path)
-      Cop::Team.mobilize(mobilized_cop_classes(config), config, @options)
+      Cop::Team.mobilize(mobilized_cop_classes_by_badge(config), config, @options)
     end
 
     def mobilized_cop_classes(config) # rubocop:disable Metrics/AbcSize
@@ -406,6 +406,30 @@ module RuboCop
       end
     end
 
+    def mobilized_cop_classes_by_badge(config) # rubocop:disable Metrics/AbcSize
+      @mobilized_cop_classes_by_badge ||= {}.compare_by_identity
+      @mobilized_cop_classes_by_badge[config] ||= begin
+        cop_badges = Cop::Registry.all_badges
+
+        # `@options[:only]` and `@options[:except]` are not qualified until
+        # needed so that the Registry can be fully loaded, including any
+        # cops added by `require`s.
+        qualify_option_cop_names
+
+        OptionsValidator.new(@options).validate_cop_options
+
+        if @options[:only]
+          cop_badges.select! { |b| b.match_name?(@options[:only]) }
+        else
+          filter_cop_badges(cop_badges, config)
+        end
+
+        cop_badges.reject! { |b| b.match_name?(@options[:except]) }
+
+        Cop::Registry.new(Cop::Registry.for_badges(cop_badges), @options)
+      end
+    end
+
     def qualify_option_cop_names
       %i[only except].each do |option|
         next unless @options[option]
@@ -421,6 +445,13 @@ module RuboCop
       return unless style_guide_cops_only?(config)
 
       cop_classes.select! { |cop| config.for_cop(cop)['StyleGuide'] }
+    end
+
+    def filter_cop_badges(cop_badges, config)
+      # use only cops that link to a style guide if requested
+      return unless style_guide_cops_only?(config)
+
+      cop_badges.select! { |badge| config.for_cop(badge.to_s)['StyleGuide'] }
     end
 
     def style_guide_cops_only?(config)
@@ -511,7 +542,7 @@ module RuboCop
                            end
                          end
       processed_source.config = config
-      processed_source.registry = mobilized_cop_classes(config)
+      processed_source.registry = mobilized_cop_classes_by_badge(config)
       processed_source
     end
     # rubocop:enable Metrics/MethodLength
@@ -523,7 +554,7 @@ module RuboCop
     def standby_team(config)
       @team_by_config ||= {}.compare_by_identity
       @team_by_config[config] ||=
-        Cop::Team.mobilize(mobilized_cop_classes(config), config, @options)
+        Cop::Team.mobilize(mobilized_cop_classes_by_badge(config), config, @options)
     end
   end
 end

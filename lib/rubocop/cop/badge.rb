@@ -63,6 +63,12 @@ module RuboCop
       def with_department(department)
         self.class.new([department.to_s.split('/'), cop_name].flatten)
       end
+
+      def match_name?(given_names)
+        return false unless given_names
+
+        given_names.include?(to_s) || given_names.include?(department_name)
+      end
     end
   end
 end

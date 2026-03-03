@@ -49,6 +49,10 @@ module RuboCop
       opt_in_cops.include?(cop.cop_name)
     end
 
+    def cop_opted_in_by_name?(cop_name)
+      opt_in_cops.include?(cop_name)
+    end
+
     def cop_disabled_line_ranges
       @cop_disabled_line_ranges ||= analyze
     end

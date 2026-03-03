@@ -177,9 +177,13 @@ module RuboCop
       # @return [Array<cop>]
       def roundup_relevant_cops(processed_source)
         cops.select do |cop|
+          # extract everything minus target_satisfies_all_gem_version_requirements?
+          # to config method which accepts a badge
+          # target_satisfies_all_gem_version_requirements?
           next false if cop.excluded_file?(processed_source.file_path)
-          next true if processed_source.comment_config.cop_opted_in?(cop)
-          next false unless @registry.enabled?(cop, @config)
+
+          next true if processed_source.comment_config.cop_opted_in_by_name?(cop.cop_name)
+          next false unless @registry.enabled_by_name?(cop.cop_name, @config)
 
           support_target_ruby_version?(cop) && support_target_rails_version?(cop)
         end

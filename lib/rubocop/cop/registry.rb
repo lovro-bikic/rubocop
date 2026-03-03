@@ -23,6 +23,14 @@ module RuboCop
         global.without_department(:Test).cops
       end
 
+      def self.all_badges
+        global.badges
+      end
+
+      def self.for_badges(badges)
+        badges.map { global.find_by_cop_name(_1.to_s) }
+      end
+
       def self.qualified_cop_name(name, origin, warn: true)
         global.qualified_cop_name(name, origin, warn: warn)
       end
@@ -51,8 +59,10 @@ module RuboCop
       def initialize(cops = [], options = {})
         @departments = Set.new
         @cops_by_cop_name = {}
+        @autoloaded_cops = {}
 
         @enrollment_queue = cops
+        @autoload_queue = []
         @options = options
 
         @enabled_cache = {}.compare_by_identity
@@ -61,6 +71,10 @@ module RuboCop
 
       def enlist(cop)
         @enrollment_queue << cop
+      end
+
+      def autoload(cop_identifier, const_name)
+        @autoload_queue << [Badge.parse(cop_identifier), const_name]
       end
 
       def dismiss(cop)
@@ -127,7 +141,7 @@ module RuboCop
       def qualified_cop_name(name, path, warn: true)
         badge = Badge.parse(name)
         print_warning(name, path) if warn && department_missing?(badge, name)
-        return name if registered?(badge.to_s)
+        return name if registered?(badge)
 
         potential_badges = qualify_badge(badge)
 
@@ -153,7 +167,7 @@ module RuboCop
       def unqualified_cop_names
         clear_enrollment_queue
         @unqualified_cop_names ||=
-          Set.new(@cops_by_cop_name.keys.map { |qn| File.basename(qn) }) <<
+          Set.new((@cops_by_cop_name.keys | @autoloaded_cops.keys).map { |badge| File.basename(badge.to_s) }) <<
           'RedundantCopDisableDirective'
       end
 
@@ -161,23 +175,31 @@ module RuboCop
         clear_enrollment_queue
         @departments
           .map { |department, _| badge.with_department(department) }
-          .select { |potential_badge| registered?(potential_badge.to_s) }
+          .select { |potential_badge| registered?(potential_badge) }
       end
 
       # @return [Hash{String => Array<Class>}]
       def to_h
         clear_enrollment_queue
-        @cops_by_cop_name.transform_values { [_1] }
+        autoload_cops
+        @cops_by_cop_name.to_h { |_badge, cop| [cop.cop_name, [cop]] }
       end
 
       def cops
         clear_enrollment_queue
+        autoload_cops
         @cops_by_cop_name.values
+      end
+
+      def badges
+        clear_enrollment_queue
+
+        @cops_by_cop_name.keys | @autoloaded_cops.keys
       end
 
       def length
         clear_enrollment_queue
-        @cops_by_cop_name.size
+        @cops_by_cop_name.size + @autoloaded_cops.size
       end
 
       def enabled(config)
@@ -204,6 +226,22 @@ module RuboCop
         end
       end
 
+      def enabled_by_name?(cop_name, config)
+        return true if options[:only]&.include?(cop_name)
+
+        # We need to use `cop_name` in this case, because `for_cop` uses caching
+        # which expects cop names or cop classes as keys.
+        cfg = config.for_cop(cop_name)
+
+        cop_enabled = cfg.fetch('Enabled') == true || enabled_pending_cop?(cfg, config)
+
+        if options.fetch(:safe, false)
+          cop_enabled && cfg.fetch('Safe', true)
+        else
+          cop_enabled
+        end
+      end
+
       def enabled_pending_cop?(cop_cfg, config)
         return false if @options[:disable_pending_cops]
 
@@ -212,7 +250,9 @@ module RuboCop
       end
 
       def names
-        cops.map(&:cop_name)
+        clear_enrollment_queue
+
+        @cops_by_cop_name.keys.map(&:to_s) | @autoloaded_cops.keys.map(&:to_s)
       end
 
       def cops_for_department(department)
@@ -229,7 +269,7 @@ module RuboCop
 
       def sort!
         clear_enrollment_queue
-        @cops_by_cop_name = @cops_by_cop_name.sort.to_h
+        @cops_by_cop_name = @cops_by_cop_name.sort_by { |badge, _cop| badge.to_s }.to_h
 
         self
       end
@@ -247,7 +287,9 @@ module RuboCop
       def find_by_cop_name(cop_name)
         clear_enrollment_queue
 
-        @cops_by_cop_name[cop_name]
+        badge = Badge.parse(cop_name)
+
+        @cops_by_cop_name[badge] || autoload_cop(badge)
       end
 
       # When a cop name is given returns a single-element array with the cop class.
@@ -260,6 +302,7 @@ module RuboCop
 
       def freeze
         clear_enrollment_queue
+        autoload_cops
         unqualified_cop_names # build cache
         super
       end
@@ -277,14 +320,34 @@ module RuboCop
       end
 
       def clear_enrollment_queue
-        return if @enrollment_queue.empty?
+        return if @enrollment_queue.empty? && @autoload_queue.empty?
 
         @enrollment_queue.each do |cop|
-          @cops_by_cop_name[cop.cop_name] = cop
+          @cops_by_cop_name[cop.badge] = cop
           @departments << cop.department
         end
+        @autoload_queue.each do |(badge, const_name)|
+          @autoloaded_cops[badge] = const_name
+          @departments << badge.department
+        end
+
         @enrollment_queue = []
+        @autoload_queue = []
         @unqualified_cop_names = nil
+      end
+
+      def autoload_cops
+        @autoloaded_cops.each_key do |badge|
+          autoload_cop(badge)
+        end
+      end
+
+      def autoload_cop(badge)
+        const_name = @autoloaded_cops.delete(badge)
+
+        return unless const_name
+
+        @cops_by_cop_name[badge] = Kernel.const_get(const_name)
       end
 
       def with(cops)
@@ -304,9 +367,10 @@ module RuboCop
         real_badge.to_s
       end
 
-      def registered?(cop_name)
+      def registered?(badge)
         clear_enrollment_queue
-        @cops_by_cop_name.key?(cop_name)
+
+        @cops_by_cop_name.key?(badge) || @autoloaded_cops.key?(badge)
       end
     end
   end
