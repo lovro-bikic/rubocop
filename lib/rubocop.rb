@@ -68,10 +68,6 @@ require_relative 'rubocop/cop/variable_force/reference'
 require_relative 'rubocop/cop/variable_force/scope'
 require_relative 'rubocop/cop/variable_force/variable_table'
 
-# TODO autoload in metrics
-require_relative 'rubocop/cop/metrics/utils/repeated_csend_discount'
-require_relative 'rubocop/cop/metrics/utils/repeated_attribute_discount'
-
 require_relative 'rubocop/cop/utils/format_string'
 
 require_relative 'rubocop/cop/bundler'

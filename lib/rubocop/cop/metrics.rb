@@ -8,6 +8,8 @@ module RuboCop
       end
 
       module Utils
+        autoload :RepeatedCsendDiscount, 'rubocop/cop/metrics/utils/repeated_csend_discount'
+        autoload :RepeatedAttributeDiscount, 'rubocop/cop/metrics/utils/repeated_attribute_discount'
         autoload :IteratingBlock, 'rubocop/cop/metrics/utils/iterating_block'
         autoload :AbcSizeCalculator, 'rubocop/cop/metrics/utils/abc_size_calculator'
         autoload :CodeLengthCalculator, 'rubocop/cop/metrics/utils/code_length_calculator'
