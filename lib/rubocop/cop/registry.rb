@@ -24,7 +24,7 @@ module RuboCop
       end
 
       def self.all_badges
-        global.badges
+        global.badges.reject { _1.department == :Test }
       end
 
       def self.for_badges(badges)
