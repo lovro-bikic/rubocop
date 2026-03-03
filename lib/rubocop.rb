@@ -100,7 +100,6 @@ require_relative 'rubocop/config_obsoletion'
 require_relative 'rubocop/config_store'
 require_relative 'rubocop/config_validator'
 require_relative 'rubocop/feature_loader'
-require_relative 'rubocop/lockfile'
 require_relative 'rubocop/lsp'
 require_relative 'rubocop/target_finder'
 require_relative 'rubocop/directive_comment'
@@ -122,7 +121,6 @@ require_relative 'rubocop/cli/command/suggest_extensions'
 require_relative 'rubocop/cli/command/version'
 require_relative 'rubocop/config_regeneration'
 require_relative 'rubocop/options'
-require_relative 'rubocop/remote_config'
 require_relative 'rubocop/target_ruby'
 require_relative 'rubocop/yaml_duplication_checker'
 require_relative 'rubocop/pending_cops_reporter'
@@ -135,6 +133,9 @@ end
 RuboCop::AST.rubocop_loaded if RuboCop::AST.respond_to?(:rubocop_loaded)
 
 module RuboCop
+  autoload :Lockfile, 'rubocop/lockfile'
+  autoload :RemoteConfig, 'rubocop/remote_config'
+
   module Cop
     # mixins
     autoload :ArrayMinSize, 'rubocop/cop/mixin/array_min_size'
