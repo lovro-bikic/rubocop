@@ -346,6 +346,7 @@ module RuboCop
         const_name = @autoloaded_cops.delete(badge)
 
         return unless const_name
+        return if @cops_by_cop_name.key?(badge)
 
         @cops_by_cop_name[badge] = Kernel.const_get(const_name)
       end
